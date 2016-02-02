@@ -5,16 +5,18 @@ local RayRelay = ...
 
 function RayRelay.new(position, angle, active)
   local newRayRelay = {
+    onColor = vec4(1.0, 1.0, 0.5, 0.7),
+    offColor = vec4(0.5, 0.5, 0.2, 1.0),
     position = position,
     length = MaxRayLength
   }
 
   local offDrawables = am.group():tag("offDrawables")
-  offDrawables:append(am.circle(vec2(0, 0), 5, vec4(0.8, 0.4, 0.2, 1.0)))
-  offDrawables:append(am.rect(0, -1, 8, 1, vec4(0.8, 0.4, 0.2, 1.0)))
+  offDrawables:append(am.circle(vec2(0, 0), 5, newRayRelay.offColor))
+  offDrawables:append(am.rect(0, -1, 8, 1, newRayRelay.offColor))
   local onDrawables = am.group():tag("onDrawables")
-  onDrawables:append(am.circle(vec2(0, 0), 5, RayColor))
-  onDrawables:append(am.rect(0, -2, MaxRayLength, 2, RayColor))
+  onDrawables:append(am.circle(vec2(0, 0), 5, newRayRelay.onColor))
+  onDrawables:append(am.rect(0, -2, MaxRayLength, 2, newRayRelay.onColor))
   newRayRelay.node = am.translate(position) ^ am.rotate(0) ^ { onDrawables, offDrawables }
 
   setmetatable(newRayRelay, { __index = RayRelay })
@@ -42,10 +44,10 @@ function RayRelay:setAngle(newAngle)
   self.node("rotate").angle = newAngle
 end
 
-function RayRelay:inSight(p, geometry)
-  for i = 1, #geometry - 1, 2 do
-    local a = geometry[i]
-    local b = geometry[i + 1]
+function RayRelay:inSight(p, walls)
+  for i = 1, #walls - 1, 2 do
+    local a = walls[i]
+    local b = walls[i + 1]
     if vutil.intersects(self.position, p, a, b) then
       return false
     end
@@ -53,13 +55,13 @@ function RayRelay:inSight(p, geometry)
   return true
 end
 
-function RayRelay:checkCollision(geometry)
+function RayRelay:checkCollision(walls)
   local bestPoint
   local bestDist
   local lineEnd = vutil.floor(self.position + vutil.withAngle(self.angle) * MaxRayLength)
-  for i = 1, #geometry - 1, 2 do
-    local a = geometry[i]
-    local b = geometry[i + 1]
+  for i = 1, #walls - 1, 2 do
+    local a = walls[i]
+    local b = walls[i + 1]
     if vutil.intersects(self.position, lineEnd, a, b) then
       local thisPoint = vutil.floor(vutil.intersectsAt(self.position, lineEnd, a, b))
       local thisDist = vutil.dist(self.position, thisPoint)
@@ -90,15 +92,25 @@ function RayRelay:setTarget(target)
   end
 end
 
-function RayRelay:findTarget(relays, geometry)
+function RayRelay:updateTarget(relays, walls)
+  if self.target then
+    if not self:inSight(self.target.position, walls) then
+      self:findTarget(relays, walls)
+    end
+  else
+    self:findTarget(relays, walls)
+  end
+end
+
+function RayRelay:findTarget(relays, walls)
   local snapDist = 15
   local snapTo
   local closestDistance = 1000
-  local lineEnd = self.position + vutil.withAngle(self.angle) * self.length
+  local lineEnd = self:rayEndpoint()
   -- log("Finding targets in ray %s to %s", self.position, lineEnd)
   for _, relay in pairs(relays) do
     if relay ~= self then
-      if self:inSight(relay.position, geometry) then
+      if self:inSight(relay.position, walls) then
         local thisDist = vutil.distToSegment(relay.position, self.position, lineEnd)
         -- log("relay at %s is %s from the line", relay.position, thisDist)
         if thisDist < snapDist and thisDist < closestDistance then
@@ -111,13 +123,11 @@ function RayRelay:findTarget(relays, geometry)
 
   if snapTo then
     self:setTarget(snapTo)
-    self.target:checkCollision(geometry)
-    self.target:findTarget(relays, geometry)
   else
     self:setTarget(nil)
   end
 end
 
-function RayRelay:rayLine()
-  return self.position, self.position + vutil.withAngle(self.angle)
+function RayRelay:rayEndpoint()
+  return self.position + vutil.withAngle(self.angle) * self.length
 end

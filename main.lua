@@ -1,9 +1,10 @@
 local vutil = require "vutil"
 local tutil = require "tutil"
 local RayRelay = require "rayrelay"
+local Renderer = require "renderer"
+local Geometry = require "geometry"
 
 MaxRayLength = 1500
-RayColor = vec4(1.0, 1.0, 0.5, 0.5)
 RayRotationRate = 2
 
 local win = am.window{
@@ -12,49 +13,12 @@ local win = am.window{
     height = 600,
     resizable = false
 }
-
 win.scene = am.group()
 
-local vshader = [[
-    precision mediump float;
-    attribute vec2 vert;
-    uniform mat4 MVP;
-    void main() {
-        gl_Position = MVP * vec4(vert, 0, 1);
-    }
-]]
-local fshader = [[
-    precision mediump float;
-    uniform vec4 color;
-    void main() {
-        gl_FragColor = color;
-    }
-]]
-local shader_program = am.program(vshader, fshader)
+local geometry = Geometry.new()
 
-local geometry = {
-  vec2(-400, -200),
-  vec2(-50, -200),
-  vec2(-50, -200),
-  vec2(50, -280),
-  vec2(50, -280),
-  vec2(400, -280)
-}
-local geoArray = am.vec2_array(geometry)
-local geoColor = vec4(0.7, 0.7, 0.7, 1.0)
-local MVP = mat4(mat2(2 / win.width, 0, 0, 2 / win.height))
-
-win.scene:append(am.use_program(shader_program) ^ am.bind({
-    vert = geoArray,
-    color = geoColor,
-    MVP = MVP
-  }):tag("levelGeometry") ^ am.draw("lines"))
-
-win.scene:append(am.use_program(shader_program) ^ am.bind({
-    vert = am.vec2_array({vec2(0), vec2(0)}),
-    color = vec4(1),
-    MVP = MVP
-  }):tag("previewGeometry") ^ am.draw("lines"))
+local renderer = Renderer.new(win, win.scene)
+renderer:setWallGeometry(geometry:wallGeometry())
 
 win.scene:append(am.translate(vec2(-win.width / 2 + 10, win.height / 2 - 10)) ^ am.text("Mouse Position", vec4(1), "left", "top"):tag("mousePosition"))
 
@@ -85,11 +49,13 @@ function findRayRelay(position)
   return closest
 end
 
-function propagateActive(relay, visited)
+function propagateRay(thisRelay, relays, walls, visited)
   visited = visited or {}
-  table.insert(visited, relay)
-  if relay.target and not tutil.find(visited, relay.target) then
-    table.merge(visited, propagateActive(relay.target, visited))
+  table.insert(visited, thisRelay)
+  thisRelay:checkCollision(walls)
+  thisRelay:findTarget(relays, walls)
+  if thisRelay.target and not tutil.find(visited, thisRelay.target) then
+    table.merge(visited, propagateRay(thisRelay.target, relays, walls, visited))
   end
   return visited
 end
@@ -100,12 +66,10 @@ win.scene:append(primeSource.node)
 
 local firstRelay = RayRelay.new(vec2(-300, 200), -math.pi / 4, true)
 addRayRelay(firstRelay)
-primeSource:setTarget(firstRelay)
-firstRelay:checkCollision(geometry)
 
-function updateActive()
-  local activeRelays = propagateActive(primeSource)
-  -- log("Found active relays %s", table.tostring(activeRelays))
+function updateRelays()
+  local activeRelays = propagateRay(primeSource, rayRelays, geometry.walls, visited)
+
   for i, relay in ipairs(rayRelays) do
     relay:setActive(tutil.find(activeRelays, relay) ~= false)
   end
@@ -115,7 +79,6 @@ local selectedRelay
 local pendingPoint
 
 win.scene:action(function(scene)
-    updateActive()
     local mousePosition = win:mouse_position()
     win.scene("mousePosition").text = mousePosition.x .. ", " .. mousePosition.y
 
@@ -127,29 +90,32 @@ win.scene:action(function(scene)
           pendingPoint = mousePosition
         end
       else
-        table.insert(geometry, pendingPoint)
-        table.insert(geometry, mousePosition)
-        win.scene("levelGeometry").vert = am.vec2_array(geometry)
+        geometry:addWall(pendingPoint, mousePosition)
+        renderer:setWallGeometry(geometry:wallGeometry())
+
+        updateRelays()
 
         pendingPoint = mousePosition
       end
     elseif win:mouse_pressed("right") then
       if pendingPoint then
         pendingPoint = nil
-        win.scene("previewGeometry").hidden = true
+        geometry.wallPreview = nil
+        renderer:setWallGeometry(geometry:wallGeometry())
       end
     end
 
     if pendingPoint then
-      win.scene("previewGeometry").vert = am.vec2_array({pendingPoint, mousePosition})
-      win.scene("previewGeometry").hidden = false
+      geometry.wallPreview = {pendingPoint, mousePosition}
+      renderer:setWallGeometry(geometry:wallGeometry())
     end
 
     if selectedRelay then
       if win:mouse_down("left") then
         selectedRelay:setAngle(vutil.angle(mousePosition - selectedRelay.position))
-        selectedRelay:checkCollision(geometry)
-        selectedRelay:findTarget(rayRelays, geometry)
+        selectedRelay:checkCollision(geometry.walls)
+        selectedRelay:findTarget(rayRelays, geometry.walls)
+        updateRelays()
       else
         selectedRelay = nil
       end
@@ -159,11 +125,15 @@ win.scene:action(function(scene)
       if win:key_pressed("1") then
         local relay = RayRelay.new(mousePosition, -math.pi / 2, false)
         addRayRelay(relay)
+        updateRelays()
       elseif win:key_pressed("backspace") then
         local toRemove = findRayRelay(mousePosition)
         if toRemove and not toRemove.permanent then
           removeRayRelay(toRemove)
+          updateRelays()
         end
       end
     end
   end)
+
+updateRelays()
