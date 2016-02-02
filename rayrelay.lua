@@ -16,7 +16,7 @@ function RayRelay.new(position, angle, active)
   offDrawables:append(am.rect(0, -1, 8, 1, newRayRelay.offColor))
   local onDrawables = am.group():tag("onDrawables")
   onDrawables:append(am.circle(vec2(0, 0), 5, newRayRelay.onColor))
-  onDrawables:append(am.rect(0, -2, MaxRayLength, 2, newRayRelay.onColor))
+  -- onDrawables:append(am.rect(0, -2, MaxRayLength, 2, newRayRelay.onColor))
   newRayRelay.node = am.translate(position) ^ am.rotate(0) ^ { onDrawables, offDrawables }
 
   setmetatable(newRayRelay, { __index = RayRelay })
@@ -42,6 +42,11 @@ end
 function RayRelay:setAngle(newAngle)
   self.angle = newAngle
   self.node("rotate").angle = newAngle
+end
+
+function RayRelay:setLength(newLength)
+  self.length = newLength
+  -- self.node("onDrawables")("rect").x2 = self.length
 end
 
 function RayRelay:inSight(p, walls)
@@ -72,19 +77,17 @@ function RayRelay:checkCollision(walls)
     end
   end
   if bestPoint then
-    self.length = bestDist
+    self:setLength(bestDist)
   else
-    self.length = MaxRayLength
+    self:setLength(MaxRayLength)
   end
-  self.node("onDrawables")("rect").x2 = self.length
 end
 
 function RayRelay:setTarget(target)
   if target then
     self.target = target
     self:setAngle(vutil.angle(target.position - self.position))
-    self.length = vutil.dist(self.position, target.position)
-    self.node("onDrawables")("rect").x2 = self.length
+    self:setLength(vutil.dist(self.position, target.position))
   else
     if self.target then
       self.target = nil

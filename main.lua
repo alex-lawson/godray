@@ -60,6 +60,15 @@ function propagateRay(thisRelay, relays, walls, visited)
   return visited
 end
 
+function buildRayGeometry(activeRelays)
+  local rayGeometry = {}
+  for i, relay in ipairs(activeRelays) do
+    table.insert(rayGeometry, relay.position)
+    table.insert(rayGeometry, relay:rayEndpoint())
+  end
+  return rayGeometry
+end
+
 local primeSource = RayRelay.new(vec2(-300, 400), -math.pi / 2, true)
 primeSource:makePermanent()
 win.scene:append(primeSource.node)
@@ -68,7 +77,9 @@ local firstRelay = RayRelay.new(vec2(-300, 200), -math.pi / 4, true)
 addRayRelay(firstRelay)
 
 function updateRelays()
-  local activeRelays = propagateRay(primeSource, rayRelays, geometry.walls, visited)
+  local activeRelays = propagateRay(primeSource, rayRelays, geometry.walls)
+
+  renderer:setRayGeometry(buildRayGeometry(activeRelays))
 
   for i, relay in ipairs(rayRelays) do
     relay:setActive(tutil.find(activeRelays, relay) ~= false)

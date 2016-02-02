@@ -39,15 +39,15 @@ function Renderer.new(window, scene)
   }):tag("wallRenderBind")
   newRenderer.wallRenderer = am.use_program(newRenderer.shaderProgram) ^ newRenderer.wallRenderBind ^ am.draw("lines")
 
-  -- newRenderer.rayRenderBind = am.bind({
-  --   vert = am.vec2_array({vec2(0), vec2(0)}),
-  --   color = newRenderer.rayColor,
-  --   MVP = newRenderer.MVP
-  -- }):tag("rayRenderBind")
-  -- newRenderer.rayRenderer = am.use_program(newRenderer.shaderProgram) ^ newRenderer.rayRenderBind ^ am.draw("lines")
+  newRenderer.rayRenderBind = am.bind({
+    vert = am.vec2_array({vec2(0), vec2(0)}),
+    color = newRenderer.rayColor,
+    MVP = newRenderer.MVP
+  }):tag("rayRenderBind")
+  newRenderer.rayRenderer = am.use_program(newRenderer.shaderProgram) ^ newRenderer.rayRenderBind ^ am.draw("lines")
 
   scene:append(newRenderer.wallRenderer)
-  -- scene:append(newRenderer.rayRenderer)
+  scene:append(newRenderer.rayRenderer)
 
   return newRenderer
 end
@@ -57,5 +57,5 @@ function Renderer:setWallGeometry(walls)
 end
 
 function Renderer:setRayGeometry(ray)
-  -- self.rayRenderBind.vert = am.vec2_array(ray)
+  self.rayRenderBind.vert = am.vec2_array(ray)
 end
