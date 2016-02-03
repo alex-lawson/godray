@@ -27,24 +27,21 @@ end
 
 function LevelManager:addRelay(position, angle)
   table.insert(self.relays, {position, angle})
-  -- self:update()
 end
 
 function LevelManager:removeRelay(relay)
   table.remove(self.relays, table.search(self.relays, relay))
-  -- self:update()
 end
 
 function LevelManager:removeRelayAt(position)
   self.relays = table.filter(self.relays, function(r) return r[1] ~= position end)
-  -- self:update()
 end
 
 function LevelManager:addDemoRelays()
   self:addRelay(vec2(self.sourcePos.x, 0), 0)
 end
 
--- RAY TRACING ETC
+-- RAY MANAGEMENT
 
 function LevelManager:updateRay()
   self.ray = self:traceRay(self.sourcePos, self.sourceAngle)
@@ -109,6 +106,23 @@ function LevelManager:relayNearPoint(p, maxDist)
   return bestRelay, bestDist
 end
 
+-- WALL MANAGEMENT
+
+function LevelManager:addWall(p, q)
+  table.insert(self.walls, p)
+  table.insert(self.walls, q)
+end
+
+function LevelManager:wallRenderGeometry()
+  if self.wallPreview then
+    local finalWalls = table.shallow_copy(self.walls)
+    table.append(finalWalls, self.wallPreview)
+    return finalWalls
+  else
+    return self.walls
+  end
+end
+
 function LevelManager:collidesWall(p, q)
   for i = 1, #self.walls - 1, 2 do
     local a = self.walls[i]
@@ -136,23 +150,6 @@ function LevelManager:collidesWallAt(p, q)
     end
   end
   return bestPoint, bestDist, bestWall
-end
-
--- WALL MANAGEMENT
-
-function LevelManager:addWall(p, q)
-  table.insert(self.walls, p)
-  table.insert(self.walls, q)
-end
-
-function LevelManager:wallRenderGeometry()
-  if self.wallPreview then
-    local finalWalls = table.shallow_copy(self.walls)
-    table.append(finalWalls, self.wallPreview)
-    return finalWalls
-  else
-    return self.walls
-  end
 end
 
 function LevelManager:addDemoWalls()

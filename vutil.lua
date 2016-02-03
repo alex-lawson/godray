@@ -99,9 +99,6 @@ function vutil.intersects(p, q, r, s)
   local bbi = vutil.boundingBoxesIntersect(p, q, r, s)
   local pqrsTouch = vutil.segmentTouchesOrCrossesLine(p, q, r, s)
   local rspqTouch = vutil.segmentTouchesOrCrossesLine(r, s, p, q)
-  -- if bbi and (not pqrsTouch or not rspqTouch) then
-  --   log("Bounding boxes intersected but pqrs %s rspq %s", tostring(pqrsTouch), tostring(rspqTouch))
-  -- end
   return bbi and pqrsTouch and rspqTouch
 end
 
@@ -116,7 +113,6 @@ function vutil.intersectsAt(p, q, r, s)
 
     -- case rs is ALSO vertical
     if r.x == s.x then
-      -- log("both lines vertical")
       -- normalize
       if p.y > q.y then
         p, q = q, p
@@ -132,7 +128,6 @@ function vutil.intersectsAt(p, q, r, s)
       y2 = math.min(q.y, s.y)
     -- case rs can be represented
     else
-      -- log("pq is vertical")
       local m, t
       m = (r.y - s.y) / (r.x - s.x)
       t = r.y - m * r.x
@@ -141,7 +136,6 @@ function vutil.intersectsAt(p, q, r, s)
     end
   -- case rs is vertical
   elseif r.x == s.x then
-    -- log("rs is vertical")
     x1 = r.x
     x2 = x1
 
@@ -160,7 +154,6 @@ function vutil.intersectsAt(p, q, r, s)
 
     -- case lines are parallel
     if mpq == mrs then
-      -- log("lines parallel but not vertical")
       -- normalize
       if p.y > q.y then
         p, q = q, p
@@ -177,7 +170,6 @@ function vutil.intersectsAt(p, q, r, s)
       y1 = mpq * x1 + tpq
       y2 = mpq * x2 + tpq
     else
-      -- log("both lines normal")
       x1 = (trs - tpq) / (mpq - mrs)
       y1 = mpq * x1 + tpq
       x2 = x1
@@ -191,54 +183,3 @@ function vutil.intersectsAt(p, q, r, s)
     return vec2(x1, y1), vec2(x2, y2)
   end
 end
-
--- -- Given three colinear points p, s1, s2, the function checks if
--- -- point p lies on line segment s1 s2
--- function vutil.onSegment(p, s1, s2)
---   return p.x <= math.max(s1.x, s2.x) and p.x >= math.min(s1.x, s2.x) and
---          p.y <= math.max(s1.y, s2.y) and p.y >= math.min(s1.y, s2.y)
--- end
-
--- -- To find orientation of ordered triplet (p1, p2, p3).
--- -- The function returns following values
--- -- 0 --> p1, p2, and p3 are colinear
--- -- 1 --> Clockwise
--- -- 2 --> Counterclockwise
--- function vutil.orientation(p1, p2, p3)
---   local val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y)
---   if val > 0 then
---     return 1
---   elseif val < 0 then
---     return 2
---   else
---     return 0
---   end
--- end
-
--- function vutil.intersect(sa1, sa2, sb1, sb2)
---   -- special cases
---   local o1 = vutil.orientation(sa1, sa2, sb1);
---   local o2 = vutil.orientation(sa1, sa2, sb2);
---   local o3 = vutil.orientation(sb1, sb2, sa1);
---   local o4 = vutil.orientation(sb1, sb2, sa2);
-
---   -- General case
---   if o1 ~= o2 and o3 ~= o4 then
---     return true
---   end
-
---   -- Special Cases
---   -- sa1, sa2 and sb1 are colinear and sb1 lies on segment sa1sa2
---   if o1 == 0 and vutil.onSegment(sa1, sb1, sa2)) then return true end
-
---   -- sa1, sa2 and sb1 are colinear and sb2 lies on segment sa1sa2
---   if o2 == 0 and vutil.onSegment(sa1, sb2, sa2)) then return true end
-
---   -- sb1, sb2 and sa1 are colinear and sa1 lies on segment sb1sb2
---   if o3 == 0 and vutil.onSegment(sb1, sa1, sb2)) then return true end
-
---   -- sb1, sb2 and sa2 are colinear and sa2 lies on segment sb1sb2
---   if o4 == 0 and vutil.onSegment(sb1, sa2, sb2)) then return true end
-
---   return false -- Doesn't fall in any of the above cases
--- end
