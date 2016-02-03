@@ -1,5 +1,4 @@
 local vutil = require "vutil"
-local tutil = require "tutil"
 
 local Geometry = ...
 

@@ -1,5 +1,4 @@
 local vutil = require "vutil"
-local tutil = require "tutil"
 
 local Renderer = ...
 
@@ -56,6 +55,15 @@ function Renderer:setWallGeometry(walls)
   self.wallRenderBind.vert = am.vec2_array(walls)
 end
 
-function Renderer:setRayGeometry(ray)
-  self.rayRenderBind.vert = am.vec2_array(ray)
+function Renderer:setRay(ray)
+  self.rayRenderBind.vert = am.vec2_array(self.buildRayGeometry(ray))
+end
+
+function Renderer.buildRayGeometry(ray)
+  local rayGeometry = {}
+  for i, relay in ipairs(ray) do
+    table.insert(rayGeometry, relay.position)
+    table.insert(rayGeometry, relay:rayEndpoint())
+  end
+  return rayGeometry
 end

@@ -1,5 +1,4 @@
 local vutil = require "vutil"
-local tutil = require "tutil"
 
 local RayRelay = ...
 
@@ -47,6 +46,17 @@ end
 function RayRelay:setLength(newLength)
   self.length = newLength
   -- self.node("onDrawables")("rect").x2 = self.length
+end
+
+function RayRelay:propagateRay(relays, walls, visited)
+  visited = visited or {}
+  table.insert(visited, self)
+  self:checkCollision(walls)
+  self:findTarget(relays, walls)
+  if self.target and not table.search(visited, self.target) then
+    table.merge(visited, self.target:propagateRay(relays, walls, visited))
+  end
+  return visited
 end
 
 function RayRelay:inSight(p, walls)

@@ -1,5 +1,4 @@
 local vutil = require "vutil"
-local tutil = require "tutil"
 local RayRelay = require "rayrelay"
 local Renderer = require "renderer"
 local Geometry = require "geometry"
@@ -31,7 +30,7 @@ end
 
 function removeRayRelay(relay)
   win.scene:remove(relay.node)
-  local i = tutil.find(rayRelays, relay)
+  local i = table.search(rayRelays, relay)
   table.remove(rayRelays, i)
 end
 
@@ -49,26 +48,6 @@ function findRayRelay(position)
   return closest
 end
 
-function propagateRay(thisRelay, relays, walls, visited)
-  visited = visited or {}
-  table.insert(visited, thisRelay)
-  thisRelay:checkCollision(walls)
-  thisRelay:findTarget(relays, walls)
-  if thisRelay.target and not tutil.find(visited, thisRelay.target) then
-    table.merge(visited, propagateRay(thisRelay.target, relays, walls, visited))
-  end
-  return visited
-end
-
-function buildRayGeometry(activeRelays)
-  local rayGeometry = {}
-  for i, relay in ipairs(activeRelays) do
-    table.insert(rayGeometry, relay.position)
-    table.insert(rayGeometry, relay:rayEndpoint())
-  end
-  return rayGeometry
-end
-
 local primeSource = RayRelay.new(vec2(-300, 400), -math.pi / 2, true)
 primeSource:makePermanent()
 win.scene:append(primeSource.node)
@@ -77,12 +56,12 @@ local firstRelay = RayRelay.new(vec2(-300, 200), -math.pi / 4, true)
 addRayRelay(firstRelay)
 
 function updateRelays()
-  local activeRelays = propagateRay(primeSource, rayRelays, geometry.walls)
+  local activeRelays = primeSource:propagateRay(rayRelays, geometry.walls)
 
-  renderer:setRayGeometry(buildRayGeometry(activeRelays))
+  renderer:setRay(activeRelays)
 
   for i, relay in ipairs(rayRelays) do
-    relay:setActive(tutil.find(activeRelays, relay) ~= false)
+    relay:setActive(table.search(activeRelays, relay) ~= nil)
   end
 end
 
