@@ -1,10 +1,7 @@
 local vutil = require "vutil"
-local RayRelay = require "rayrelay"
-local Renderer = require "renderer"
-local Geometry = require "geometry"
 
-MaxRayLength = 1500
-RayRotationRate = 2
+local Renderer = require "renderer"
+local LevelManager = require "levelmanager"
 
 local win = am.window{
     title = "GOD*RAY",
@@ -14,55 +11,16 @@ local win = am.window{
 }
 win.scene = am.group()
 
-local geometry = Geometry.new()
-
 local renderer = Renderer.new(win, win.scene)
-renderer:setWallGeometry(geometry:wallGeometry())
+local level = LevelManager.new()
 
-win.scene:append(am.translate(vec2(-win.width / 2 + 10, win.height / 2 - 10)) ^ am.text("Mouse Position", vec4(1), "left", "top"):tag("mousePosition"))
+win.scene:append(am.translate(vec2(-win.width / 2 + 10, win.height / 2 - 10)) ^ am.text("", vec4(1), "left", "top"):tag("debugInfo"))
 
-local rayRelays = {}
-
-function addRayRelay(relay)
-  table.insert(rayRelays, relay)
-  win.scene:append(relay.node)
-end
-
-function removeRayRelay(relay)
-  win.scene:remove(relay.node)
-  local i = table.search(rayRelays, relay)
-  table.remove(rayRelays, i)
-end
-
-function findRayRelay(position)
-  local searchDist = 20
-  local closest
-  local closestDistance = 1000
-  for i, relay in ipairs(rayRelays) do
-    local dist = vutil.dist(position, relay.position)
-    if dist < searchDist and dist < closestDistance then
-      closest = relay
-      closestDistance = dist
-    end
-  end
-  return closest
-end
-
-local primeSource = RayRelay.new(vec2(-300, 400), -math.pi / 2, true)
-primeSource:makePermanent()
-win.scene:append(primeSource.node)
-
-local firstRelay = RayRelay.new(vec2(-300, 200), -math.pi / 4, true)
-addRayRelay(firstRelay)
-
-function updateRelays()
-  local activeRelays = primeSource:propagateRay(rayRelays, geometry.walls)
-
-  renderer:setRay(activeRelays)
-
-  for i, relay in ipairs(rayRelays) do
-    relay:setActive(table.search(activeRelays, relay) ~= nil)
-  end
+function levelChanged()
+  level:updateRay()
+  renderer:setRelays(level.relays)
+  renderer:setRay(level.ray)
+  renderer:setWalls(level:wallRenderGeometry())
 end
 
 local selectedRelay
@@ -70,42 +28,39 @@ local pendingPoint
 
 win.scene:action(function(scene)
     local mousePosition = win:mouse_position()
-    win.scene("mousePosition").text = mousePosition.x .. ", " .. mousePosition.y
+    win.scene("debugInfo").text = mousePosition.x .. ", " .. mousePosition.y .. "   walls " .. #level.walls / 2 .. "   relays " .. #level.relays
 
     if win:mouse_pressed("left") then
       if not pendingPoint then
-        selectedRelay = findRayRelay(mousePosition)
+        selectedRelay = level:relayNearPoint(mousePosition, 20)
 
         if not selectedRelay then
           pendingPoint = mousePosition
         end
       else
-        geometry:addWall(pendingPoint, mousePosition)
-        renderer:setWallGeometry(geometry:wallGeometry())
+        level:addWall(pendingPoint, mousePosition)
 
-        updateRelays()
+        levelChanged()
 
         pendingPoint = mousePosition
       end
     elseif win:mouse_pressed("right") then
       if pendingPoint then
         pendingPoint = nil
-        geometry.wallPreview = nil
-        renderer:setWallGeometry(geometry:wallGeometry())
+        level.wallPreview = nil
+        renderer:setWalls(level:wallRenderGeometry())
       end
     end
 
     if pendingPoint then
-      geometry.wallPreview = {pendingPoint, mousePosition}
-      renderer:setWallGeometry(geometry:wallGeometry())
+      level.wallPreview = {pendingPoint, mousePosition}
+      renderer:setWalls(level:wallRenderGeometry())
     end
 
     if selectedRelay then
       if win:mouse_down("left") then
-        selectedRelay:setAngle(vutil.angle(mousePosition - selectedRelay.position))
-        selectedRelay:checkCollision(geometry.walls)
-        selectedRelay:findTarget(rayRelays, geometry.walls)
-        updateRelays()
+        selectedRelay[2] = vutil.angle(mousePosition - selectedRelay[1])
+        levelChanged()
       else
         selectedRelay = nil
       end
@@ -113,17 +68,18 @@ win.scene:action(function(scene)
 
     if not selectedRelay and not pendingPoint then
       if win:key_pressed("1") then
-        local relay = RayRelay.new(mousePosition, -math.pi / 2, false)
-        addRayRelay(relay)
-        updateRelays()
+        level:addRelay(mousePosition, 0)
+        levelChanged()
       elseif win:key_pressed("backspace") then
-        local toRemove = findRayRelay(mousePosition)
-        if toRemove and not toRemove.permanent then
-          removeRayRelay(toRemove)
-          updateRelays()
+        toRemove = level:relayNearPoint(mousePosition, 20)
+        if toRemove then
+          level:removeRelay(toRemove)
+          levelChanged()
         end
       end
     end
   end)
 
-updateRelays()
+level:addDemoWalls()
+level:addDemoRelays()
+levelChanged()
