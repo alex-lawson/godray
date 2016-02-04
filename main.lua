@@ -21,40 +21,60 @@ function levelChanged()
   renderer:setRelays(level.relays)
   renderer:setRay(level.ray)
   renderer:setWalls(level:wallRenderGeometry())
+  renderer:setMirrors(level:mirrorRenderGeometry())
 end
 
 local selectedRelay
-local pendingPoint
+local pendingWall
+local pendingMirror
+
+function clearPendingWall()
+  if pendingWall then
+    pendingWall = nil
+    level.wallPreview = nil
+    renderer:setWalls(level:wallRenderGeometry())
+  end
+end
+
+function clearPendingMirror()
+  if pendingMirror then
+    pendingMirror = nil
+    level.mirrorPreview = nil
+    renderer:setMirrors(level:mirrorRenderGeometry())
+  end
+end
 
 win.scene:action(function(scene)
     local mousePosition = win:mouse_position()
     win.scene("debugInfo").text = mousePosition.x .. ", " .. mousePosition.y .. "   walls " .. #level.walls / 2 .. "   relays " .. #level.relays
 
     if win:mouse_pressed("left") then
-      if not pendingPoint then
+      if not pendingWall then
         selectedRelay = level:relayNearPoint(mousePosition, 20)
 
         if not selectedRelay then
-          pendingPoint = mousePosition
+          pendingWall = mousePosition
         end
       else
-        level:addWall(pendingPoint, mousePosition)
+        level:addWall(pendingWall, mousePosition)
 
         levelChanged()
 
-        pendingPoint = mousePosition
+        pendingWall = mousePosition
       end
     elseif win:mouse_pressed("right") then
-      if pendingPoint then
-        pendingPoint = nil
-        level.wallPreview = nil
-        renderer:setWalls(level:wallRenderGeometry())
-      end
+      clearPendingWall()
+      clearPendingMirror()
     end
 
-    if pendingPoint then
-      level.wallPreview = {pendingPoint, mousePosition}
+    if pendingWall then
+      level.wallPreview = {pendingWall, mousePosition}
       renderer:setWalls(level:wallRenderGeometry())
+    end
+
+    if pendingMirror then
+      level.mirrorPreview = {pendingMirror, mousePosition}
+      renderer:setMirrors(level:mirrorRenderGeometry())
     end
 
     if selectedRelay then
@@ -66,14 +86,51 @@ win.scene:action(function(scene)
       end
     end
 
-    if not selectedRelay and not pendingPoint then
-      if win:key_pressed("1") then
+    if not selectedRelay then
+      if win:key_pressed("r") then
+        clearPendingWall()
+        clearPendingMirror()
         level:addRelay(mousePosition, 0)
         levelChanged()
+      elseif win:key_pressed("1") then
+        if pendingWall then
+          level:addWall(pendingWall, mousePosition)
+          levelChanged()
+        end
+
+        if not pendingMirror then
+          pendingWall = mousePosition
+        else
+          clearPendingMirror()
+        end
+      elseif win:key_pressed("2") then
+        if pendingMirror then
+          level:addMirror(pendingMirror, mousePosition)
+          levelChanged()
+        end
+
+        if not pendingWall then
+          pendingMirror = mousePosition
+        else
+          clearPendingWall()
+        end
       elseif win:key_pressed("backspace") then
-        toRemove = level:relayNearPoint(mousePosition, 20)
-        if toRemove then
-          level:removeRelay(toRemove)
+        clearPendingWall()
+        clearPendingMirror()
+        -- TODO: proper entity management
+        local relay, relayDist = level:relayNearPoint(mousePosition, 15)
+        local wallIndex, wallDist = level:wallNearPoint(mousePosition, 8)
+        local mirrorIndex, mirrorDist = level:mirrorNearPoint(mousePosition, 8)
+        local t = {{relay, relayDist}, {wall, wallDist}, {mirror, mirrorDist}}
+        table.sort(t, function(a, b) return b[2] == nil or (a[2] ~= nil and a[2] < b[2]) or false end)
+        if t[1][2] then
+          if relay and t[1][2] == relayDist then
+            level:removeRelay(relay)
+          elseif wallIndex and t[1][2] == wallDist then
+            level:removeWall(wallIndex)
+          elseif mirrorIndex and t[1][2] == mirrorDist then
+            level:removeMirror(mirrorIndex)
+          end
           levelChanged()
         end
       end
@@ -81,5 +138,6 @@ win.scene:action(function(scene)
   end)
 
 level:addDemoWalls()
+level:addDemoMirrors()
 level:addDemoRelays()
 levelChanged()

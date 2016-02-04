@@ -9,7 +9,8 @@ function Renderer.new(window, scene)
     relaySize = 15,
     relayColor = vec4(0.5, 0.5, 0.4, 1.0),
     rayColor = vec4(1.0, 1.0, 0.5, 0.5),
-    wallColor = vec4(0.7, 0.7, 0.7, 1.0)
+    wallColor = vec4(0.5, 0.5, 0.5, 1.0),
+    mirrorColor = vec4(0.6, 0.8, 1.0, 1.0)
   }
 
   setmetatable(newRenderer, { __index = Renderer })
@@ -40,6 +41,13 @@ function Renderer.new(window, scene)
   }):tag("wallRenderBind")
   newRenderer.wallRenderer = am.use_program(newRenderer.shaderProgram) ^ newRenderer.wallRenderBind ^ am.draw("lines")
 
+  newRenderer.mirrorRenderBind = am.bind({
+    vert = am.vec2_array({vec2(0), vec2(0)}),
+    color = newRenderer.mirrorColor,
+    MVP = newRenderer.MVP
+  }):tag("mirrorRenderBind")
+  newRenderer.mirrorRenderer = am.use_program(newRenderer.shaderProgram) ^ newRenderer.mirrorRenderBind ^ am.draw("lines")
+
   newRenderer.rayRenderBind = am.bind({
     vert = am.vec2_array({vec2(0), vec2(0)}),
     color = newRenderer.rayColor,
@@ -55,6 +63,7 @@ function Renderer.new(window, scene)
   newRenderer.relayRenderer = am.use_program(newRenderer.shaderProgram) ^ newRenderer.relayRenderBind ^ am.draw("triangles")
 
   scene:append(newRenderer.wallRenderer)
+  scene:append(newRenderer.mirrorRenderer)
   scene:append(newRenderer.relayRenderer)
   scene:append(newRenderer.rayRenderer)
 
@@ -67,6 +76,14 @@ function Renderer:setWalls(walls)
   end
 
   self.wallRenderBind.vert = am.vec2_array(walls)
+end
+
+function Renderer:setMirrors(mirrors)
+  if #mirrors == 0 then
+    mirrors = {vec2(0)}
+  end
+
+  self.mirrorRenderBind.vert = am.vec2_array(mirrors)
 end
 
 function Renderer:setRay(ray)

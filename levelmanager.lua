@@ -10,7 +10,9 @@ function LevelManager.new()
     relays = {},
     ray = {},
     walls = {},
-    wallPreview = nil
+    wallPreview = nil,
+    mirrors = {},
+    mirrorPreview = nil
   }
 
   setmetatable(newLevelManager, { __index = LevelManager })
@@ -51,7 +53,6 @@ function LevelManager:traceRay(position, angle, points)
   points = points or {position}
 
   local searchEndpoint = position + vutil.withAngle(angle) * self.maxRayLength
-
   local relay = self:relayNearLine(position, searchEndpoint)
   if relay then
     local oldIndex = table.search(points, relay[1])
@@ -106,27 +107,85 @@ function LevelManager:relayNearPoint(p, maxDist)
   return bestRelay, bestDist
 end
 
--- WALL MANAGEMENT
+-- WALL AND MIRROR MANAGEMENT
+
+-- TODO: abstract segment manager
 
 function LevelManager:addWall(p, q)
   table.insert(self.walls, p)
   table.insert(self.walls, q)
 end
 
+function LevelManager:addMirror(p, q)
+  table.insert(self.mirrors, p)
+  table.insert(self.mirrors, q)
+end
+
+function LevelManager:removeWall(index)
+  table.remove(self.walls, index)
+  table.remove(self.walls, index)
+end
+
+function LevelManager:removeMirror(index)
+  table.remove(self.mirrors, index)
+  table.remove(self.mirrors, index)
+end
+
+function LevelManager:wallNearPoint(p, maxDist)
+  return self.segmentNearPoint(self.walls, p, maxDist)
+end
+
+function LevelManager:mirrorNearPoint(p, maxDist)
+  return self.segmentNearPoint(self.mirrors, p, maxDist)
+end
+
+function LevelManager.segmentNearPoint(segments, p, maxDist)
+  maxDist = maxDist or 15
+  local bestIndex, bestDist
+  for i = 1, #segments - 1, 2 do
+    local a = segments[i]
+    local b = segments[i + 1]
+    local thisDist = vutil.distToSegment(p, a, b)
+    if thisDist <= maxDist and (not bestDist or thisDist < bestDist) then
+      bestDist = thisDist
+      bestIndex = i
+    end
+  end
+  return bestIndex, bestDist
+end
+
 function LevelManager:wallRenderGeometry()
-  if self.wallPreview then
-    local finalWalls = table.shallow_copy(self.walls)
-    table.append(finalWalls, self.wallPreview)
-    return finalWalls
+  return self.geometryWithPreview(self.walls, self.wallPreview)
+end
+
+function LevelManager:mirrorRenderGeometry()
+  return self.geometryWithPreview(self.mirrors, self.mirrorPreview)
+end
+
+function LevelManager.geometryWithPreview(baseGeometry, previewGeometry)
+  if previewGeometry then
+    local finalGeometry = table.shallow_copy(baseGeometry)
+    table.append(finalGeometry, previewGeometry)
+    return finalGeometry
   else
-    return self.walls
+    return baseGeometry
   end
 end
 
 function LevelManager:collidesWall(p, q)
-  for i = 1, #self.walls - 1, 2 do
-    local a = self.walls[i]
-    local b = self.walls[i + 1]
+  return self.collidesSegment(self.walls, p, q)
+end
+
+function LevelManager:collidesMirror(p, q)
+  return self.collidesSegment(self.mirrors, p, q)
+end
+
+function LevelManager.collidesSegment(segments, p, q)
+  if #segments < 2 then return false end
+
+  for i = 1, #segments - 1, 2 do
+    local a = segments[i]
+    local b = segments[i + 1]
     if vutil.intersects(p, q, a, b) then
       return true
     end
@@ -135,21 +194,30 @@ function LevelManager:collidesWall(p, q)
 end
 
 function LevelManager:collidesWallAt(p, q)
-  local bestPoint, bestDist, bestWall
-  for i = 1, #self.walls - 1, 2 do
-    local a = self.walls[i]
-    local b = self.walls[i + 1]
+  return self.collidesSegmentAt(self.walls, p, q)
+end
+
+function LevelManager:collidesMirrorAt(p, q)
+  return self.collidesSegmentAt(self.mirrors, p, q)
+end
+
+function LevelManager.collidesSegmentAt(segments, p, q)
+  if #segments < 2 then return nil end
+  local bestPoint, bestDist, bestSegment
+  for i = 1, #segments - 1, 2 do
+    local a = segments[i]
+    local b = segments[i + 1]
     if vutil.intersects(p, q, a, b) then
       local thisPoint = vutil.floor(vutil.intersectsAt(p, q, a, b))
       local thisDist = vutil.dist(p, thisPoint)
       if not bestDist or thisDist < bestDist then
         bestPoint = thisPoint
         bestDist = thisDist
-        bestWall = {a, b}
+        bestSegment = {a, b}
       end
     end
   end
-  return bestPoint, bestDist, bestWall
+  return bestPoint, bestDist, bestSegment
 end
 
 function LevelManager:addDemoWalls()
@@ -160,5 +228,12 @@ function LevelManager:addDemoWalls()
     vec2(50, -280),
     vec2(50, -280),
     vec2(400, -280)
+  }
+end
+
+function LevelManager:addDemoMirrors()
+  self.mirrors = {
+    vec2(200, 50),
+    vec2(300, -50)
   }
 end
