@@ -46,22 +46,12 @@ end
 
 win.scene:action(function(scene)
     local mousePosition = win:mouse_position()
-    win.scene("debugInfo").text = mousePosition.x .. ", " .. mousePosition.y .. "   walls " .. #level.walls / 2 .. "   relays " .. #level.relays
+    win.scene("debugInfo").text = mousePosition.x .. ", " .. mousePosition.y .. "   walls " .. #level.walls / 2 .. "   mirrors " .. #level.mirrors / 2 .. "   relays " .. #level.relays
 
     if win:mouse_pressed("left") then
-      if not pendingWall then
-        selectedRelay = level:relayNearPoint(mousePosition, 20)
-
-        if not selectedRelay then
-          pendingWall = mousePosition
-        end
-      else
-        level:addWall(pendingWall, mousePosition)
-
-        levelChanged()
-
-        pendingWall = mousePosition
-      end
+      clearPendingWall()
+      clearPendingMirror()
+      selectedRelay = level:relayNearPoint(mousePosition, 20)
     elseif win:mouse_pressed("right") then
       clearPendingWall()
       clearPendingMirror()

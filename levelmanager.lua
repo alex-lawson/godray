@@ -49,8 +49,13 @@ function LevelManager:updateRay()
   self.ray = self:traceRay(self.sourcePos, self.sourceAngle)
 end
 
-function LevelManager:traceRay(position, angle, points)
+function LevelManager:traceRay(position, angle, points, recursion, lastMirror)
   points = points or {position}
+  recursion = recursion or 0
+
+  if recursion > 10 then return points end
+
+  -- log("tracing ray with recursion %s position %s angle %s", recursion, position, angle)
 
   local searchEndpoint = position + vutil.withAngle(angle) * self.maxRayLength
   local relay = self:relayNearLine(position, searchEndpoint)
@@ -63,13 +68,36 @@ function LevelManager:traceRay(position, angle, points)
       return points
     else
       table.insert(points, relay[1])
-      return self:traceRay(relay[1], relay[2], points)
+      return self:traceRay(relay[1], relay[2], points, recursion + 1)
     end
   end
 
-  if self:collidesWall(position, searchEndpoint) then
-    local collidePoint = self:collidesWallAt(position, searchEndpoint)
-    table.insert(points, collidePoint)
+  local wallPoint, wallDist
+  local collidesWall = self:collidesWall(position, searchEndpoint)
+  if collidesWall then
+    wallPoint, wallDist = self:collidesWallAt(position, searchEndpoint)
+  end
+
+  local mirrorPoint, mirrorDist, mirror
+  local collidesMirror = self:collidesMirror(position, searchEndpoint, lastMirror)
+  if collidesMirror then
+    mirrorPoint, mirrorDist, mirror = self:collidesMirrorAt(position, searchEndpoint, lastMirror)
+  end
+
+  if collidesMirror and (not collidesWall or wallDist > mirrorDist) then
+    local v = mirrorPoint - position
+    local sv = mirror[2] - mirror[1]
+    local normal = vec2(-sv.y, sv.x)
+    if vutil.pointRightOfLine(position, mirror[1], mirror[2]) ~= vutil.pointRightOfLine(mirrorPoint + normal, mirror[1], mirror[2]) then
+      normal = vec2(sv.y, -sv.x)
+    end
+    normal = vutil.norm(normal)
+    local reflectVector = vutil.reflect(v, normal)
+    -- mirrorPoint = mirrorPoint + (1.2 * normal)
+    table.insert(points, mirrorPoint)
+    return self:traceRay(mirrorPoint, vutil.angle(reflectVector), points, recursion + 1, mirror)
+  elseif collidesWall then
+    table.insert(points, wallPoint)
     return points
   end
 
@@ -84,7 +112,7 @@ function LevelManager:relayNearLine(p, q, maxDist)
     if relay[1] ~= p then
       local thisDist = vutil.distToSegment(relay[1], p, q)
       if thisDist < maxDist and (not bestDist or thisDist < bestDist) then
-        if not self:collidesWall(p, relay[1]) then
+        if not self:collidesWall(p, relay[1]) and not self:collidesMirror(p, relay[1]) then
           bestRelay = relay
           bestDist = thisDist
         end
@@ -176,18 +204,23 @@ function LevelManager:collidesWall(p, q)
   return self.collidesSegment(self.walls, p, q)
 end
 
-function LevelManager:collidesMirror(p, q)
-  return self.collidesSegment(self.mirrors, p, q)
+function LevelManager:collidesMirror(p, q, exclude)
+  -- log("searching for mirrors excluding %s %s", exclude and exclude[1] or "nothing", exclude and exclude[2] or "at all")
+  return self.collidesSegment(self.mirrors, p, q, exclude)
 end
 
-function LevelManager.collidesSegment(segments, p, q)
+function LevelManager.collidesSegment(segments, p, q, exclude)
   if #segments < 2 then return false end
 
   for i = 1, #segments - 1, 2 do
     local a = segments[i]
     local b = segments[i + 1]
-    if vutil.intersects(p, q, a, b) then
-      return true
+    if not (exclude and a == exclude[1] and b == exclude[2]) then
+      if vutil.intersects(p, q, a, b) then
+        return true
+      end
+    else
+      -- log("ignoring segment %s %s", a, b)
     end
   end
   return false
@@ -197,8 +230,8 @@ function LevelManager:collidesWallAt(p, q)
   return self.collidesSegmentAt(self.walls, p, q)
 end
 
-function LevelManager:collidesMirrorAt(p, q)
-  return self.collidesSegmentAt(self.mirrors, p, q)
+function LevelManager:collidesMirrorAt(p, q, exclude)
+  return self.collidesSegmentAt(self.mirrors, p, q, exclude)
 end
 
 function LevelManager.collidesSegmentAt(segments, p, q)
@@ -207,14 +240,18 @@ function LevelManager.collidesSegmentAt(segments, p, q)
   for i = 1, #segments - 1, 2 do
     local a = segments[i]
     local b = segments[i + 1]
-    if vutil.intersects(p, q, a, b) then
-      local thisPoint = vutil.floor(vutil.intersectsAt(p, q, a, b))
-      local thisDist = vutil.dist(p, thisPoint)
-      if not bestDist or thisDist < bestDist then
-        bestPoint = thisPoint
-        bestDist = thisDist
-        bestSegment = {a, b}
+    if not (exclude and a == exclude[1] and b == exclude[2]) then
+      if vutil.intersects(p, q, a, b) then
+        local thisPoint = vutil.floor(vutil.intersectsAt(p, q, a, b))
+        local thisDist = vutil.dist(p, thisPoint)
+        if not bestDist or thisDist < bestDist then
+          bestPoint = thisPoint
+          bestDist = thisDist
+          bestSegment = {a, b}
+        end
       end
+    else
+      -- log("AT ignoring segment %s %s", a, b)
     end
   end
   return bestPoint, bestDist, bestSegment

@@ -42,6 +42,10 @@ function vutil.cross(v1, v2)
   return v1.x * v2.y - v2.x * v1.y
 end
 
+function vutil.reflect(v, normal)
+  return v - 2 * vutil.dot(v, normal) * normal
+end
+
 function vutil.distToLine(p, l1, l2)
   local v = l2 - l1
   local w = p - l1
@@ -95,10 +99,20 @@ function vutil.segmentTouchesOrCrossesLine(p, q, r, s)
          (vutil.pointRightOfLine(r, p, q) ~= vutil.pointRightOfLine(s, p, q))
 end
 
+function vutil.segmentCrossesLine(p, q, r, s)
+  return vutil.pointRightOfLine(r, p, q) ~= vutil.pointRightOfLine(s, p, q)
+end
+
+function vutil.segmentOnlyCrossesLine(p, q, r, s)
+  return not vutil.pointOnLine(r, p, q) and
+         not vutil.pointOnLine(s, p, q) and
+         vutil.pointRightOfLine(r, p, q) ~= vutil.pointRightOfLine(s, p, q)
+end
+
 function vutil.intersects(p, q, r, s)
   local bbi = vutil.boundingBoxesIntersect(p, q, r, s)
-  local pqrsTouch = vutil.segmentTouchesOrCrossesLine(p, q, r, s)
-  local rspqTouch = vutil.segmentTouchesOrCrossesLine(r, s, p, q)
+  local pqrsTouch = vutil.segmentOnlyCrossesLine(p, q, r, s)
+  local rspqTouch = vutil.segmentOnlyCrossesLine(r, s, p, q)
   return bbi and pqrsTouch and rspqTouch
 end
 
