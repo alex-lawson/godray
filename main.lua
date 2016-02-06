@@ -72,6 +72,9 @@ win.scene:action(function(scene)
     if selectedRelay then
       if win:mouse_down("left") then
         selectedRelay[2] = vutil.angle(mousePosition - selectedRelay[1])
+        if selectedRelay[3] then
+          selectedRelay[2] = selectedRelay[2] + math.pi * 0.5
+        end
         levelChanged()
       else
         selectedRelay = nil
