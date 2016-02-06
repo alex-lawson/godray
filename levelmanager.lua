@@ -1,5 +1,7 @@
 local vutil = require "vutil"
 
+MinimumBounce = 3
+
 local LevelManager = ...
 
 function LevelManager.new()
@@ -12,7 +14,8 @@ function LevelManager.new()
     walls = {},
     wallPreview = nil,
     mirrors = {},
-    mirrorPreview = nil
+    mirrorPreview = nil,
+    lastRecursion = 0
   }
 
   setmetatable(newLevelManager, { __index = LevelManager })
@@ -46,29 +49,29 @@ end
 -- RAY MANAGEMENT
 
 function LevelManager:updateRay()
-  self.ray = self:traceRay(self.sourcePos, self.sourceAngle)
+  self.ray, self.lastRecursion = self:traceRay(self.sourcePos, self.sourceAngle)
 end
 
 function LevelManager:traceRay(position, angle, points, recursion, lastMirror)
   points = points or {position}
   recursion = recursion or 0
 
-  if recursion > 10 then return points end
+  if recursion > 10 then return points, recursion end
 
   -- log("tracing ray with recursion %s position %s angle %s", recursion, position, angle)
 
   local searchEndpoint = position + vutil.withAngle(angle) * self.maxRayLength
-  local relay = self:relayNearLine(position, searchEndpoint)
+  local relay = self:relayNearLine(position, searchEndpoint, 10, lastMirror)
   if relay then
     local oldIndex = table.search(points, relay[1])
     if oldIndex == #points - 1 then
-      return points
+      return points, recursion
     elseif oldIndex then
       table.insert(points, relay[1])
-      return points
+      return points, recursion
     else
       table.insert(points, relay[1])
-      return self:traceRay(relay[1], relay[2], points, recursion + 1)
+      return self:traceRay(relay[1], relay[2], points, 0)
     end
   end
 
@@ -84,7 +87,9 @@ function LevelManager:traceRay(position, angle, points, recursion, lastMirror)
     mirrorPoint, mirrorDist, mirror = self:collidesMirrorAt(position, searchEndpoint, lastMirror)
   end
 
-  if collidesMirror and (not collidesWall or wallDist > mirrorDist) then
+  if collidesMirror and mirrorDist < MinimumBounce then
+    return points, 99
+  elseif collidesMirror and (not collidesWall or wallDist > mirrorDist) then
     local v = mirrorPoint - position
     local sv = mirror[2] - mirror[1]
     local normal = vec2(-sv.y, sv.x)
@@ -93,26 +98,25 @@ function LevelManager:traceRay(position, angle, points, recursion, lastMirror)
     end
     normal = vutil.norm(normal)
     local reflectVector = vutil.reflect(v, normal)
-    -- mirrorPoint = mirrorPoint + (1.2 * normal)
     table.insert(points, mirrorPoint)
     return self:traceRay(mirrorPoint, vutil.angle(reflectVector), points, recursion + 1, mirror)
   elseif collidesWall then
     table.insert(points, wallPoint)
-    return points
+    return points, recursion
   end
 
   table.insert(points, searchEndpoint)
-  return points
+  return points, recursion
 end
 
-function LevelManager:relayNearLine(p, q, maxDist)
+function LevelManager:relayNearLine(p, q, maxDist, excludeMirror)
   maxDist = maxDist or 15
   local bestRelay, bestDist
   for i, relay in ipairs(self.relays) do
     if relay[1] ~= p then
       local thisDist = vutil.distToSegment(relay[1], p, q)
       if thisDist < maxDist and (not bestDist or thisDist < bestDist) then
-        if not self:collidesWall(p, relay[1]) and not self:collidesMirror(p, relay[1]) then
+        if not self:collidesWall(p, relay[1]) and not self:collidesMirror(p, relay[1], excludeMirror) then
           bestRelay = relay
           bestDist = thisDist
         end
@@ -140,23 +144,19 @@ end
 -- TODO: abstract segment manager
 
 function LevelManager:addWall(p, q)
-  table.insert(self.walls, p)
-  table.insert(self.walls, q)
+  table.insert(self.walls, {p, q})
 end
 
 function LevelManager:addMirror(p, q)
-  table.insert(self.mirrors, p)
-  table.insert(self.mirrors, q)
+  table.insert(self.mirrors, {p, q})
 end
 
-function LevelManager:removeWall(index)
-  table.remove(self.walls, index)
-  table.remove(self.walls, index)
+function LevelManager:removeWall(wall)
+  table.remove(self.walls, table.search(self.walls, wall))
 end
 
-function LevelManager:removeMirror(index)
-  table.remove(self.mirrors, index)
-  table.remove(self.mirrors, index)
+function LevelManager:removeMirror(mirror)
+  table.remove(self.mirrors, table.search(self.mirrors, mirror))
 end
 
 function LevelManager:wallNearPoint(p, maxDist)
@@ -169,17 +169,15 @@ end
 
 function LevelManager.segmentNearPoint(segments, p, maxDist)
   maxDist = maxDist or 15
-  local bestIndex, bestDist
-  for i = 1, #segments - 1, 2 do
-    local a = segments[i]
-    local b = segments[i + 1]
-    local thisDist = vutil.distToSegment(p, a, b)
+  local bestSegment, bestDist
+  for i, segment in ipairs(segments) do
+    local thisDist = vutil.distToSegment(p, segment[1], segment[2])
     if thisDist <= maxDist and (not bestDist or thisDist < bestDist) then
       bestDist = thisDist
-      bestIndex = i
+      bestSegment = segment
     end
   end
-  return bestIndex, bestDist
+  return bestSegment, bestDist
 end
 
 function LevelManager:wallRenderGeometry()
@@ -191,13 +189,17 @@ function LevelManager:mirrorRenderGeometry()
 end
 
 function LevelManager.geometryWithPreview(baseGeometry, previewGeometry)
-  if previewGeometry then
-    local finalGeometry = table.shallow_copy(baseGeometry)
-    table.append(finalGeometry, previewGeometry)
-    return finalGeometry
-  else
-    return baseGeometry
+  local finalGeometry = {}
+
+  for i, segment in ipairs(baseGeometry) do
+    table.append(finalGeometry, segment)
   end
+
+  if previewGeometry then
+    table.append(finalGeometry, previewGeometry)
+  end
+
+  return finalGeometry
 end
 
 function LevelManager:collidesWall(p, q)
@@ -210,17 +212,13 @@ function LevelManager:collidesMirror(p, q, exclude)
 end
 
 function LevelManager.collidesSegment(segments, p, q, exclude)
-  if #segments < 2 then return false end
-
-  for i = 1, #segments - 1, 2 do
-    local a = segments[i]
-    local b = segments[i + 1]
-    if not (exclude and a == exclude[1] and b == exclude[2]) then
-      if vutil.intersects(p, q, a, b) then
+  for i, segment in ipairs(segments) do
+    if not (exclude and segment[1] == exclude[1] and segment[2] == exclude[2]) then
+      if vutil.intersects(p, q, segment[1], segment[2]) then
         return true
       end
     else
-      -- log("ignoring segment %s %s", a, b)
+      -- log("ignoring segment %s %s", segment[1], segment[2])
     end
   end
   return false
@@ -234,24 +232,21 @@ function LevelManager:collidesMirrorAt(p, q, exclude)
   return self.collidesSegmentAt(self.mirrors, p, q, exclude)
 end
 
-function LevelManager.collidesSegmentAt(segments, p, q)
-  if #segments < 2 then return nil end
+function LevelManager.collidesSegmentAt(segments, p, q, exclude)
   local bestPoint, bestDist, bestSegment
-  for i = 1, #segments - 1, 2 do
-    local a = segments[i]
-    local b = segments[i + 1]
-    if not (exclude and a == exclude[1] and b == exclude[2]) then
-      if vutil.intersects(p, q, a, b) then
-        local thisPoint = vutil.floor(vutil.intersectsAt(p, q, a, b))
+  for i, segment in ipairs(segments) do
+    if segment ~= exclude then
+      if vutil.intersects(p, q, segment[1], segment[2]) then
+        local thisPoint = vutil.floor(vutil.intersectsAt(p, q, segment[1], segment[2]))
         local thisDist = vutil.dist(p, thisPoint)
         if not bestDist or thisDist < bestDist then
           bestPoint = thisPoint
           bestDist = thisDist
-          bestSegment = {a, b}
+          bestSegment = segment
         end
       end
     else
-      -- log("AT ignoring segment %s %s", a, b)
+      -- log("AT ignoring segment %s %s", segment[1], segment[2])
     end
   end
   return bestPoint, bestDist, bestSegment
@@ -259,18 +254,22 @@ end
 
 function LevelManager:addDemoWalls()
   self.walls = {
-    vec2(-400, -200),
-    vec2(-50, -200),
-    vec2(-50, -200),
-    vec2(50, -280),
-    vec2(50, -280),
-    vec2(400, -280)
+    {vec2(-400, -200),
+    vec2(-50, -200)},
+    {vec2(-50, -200),
+    vec2(50, -280)},
+    {vec2(50, -280),
+    vec2(400, -280)}
   }
 end
 
 function LevelManager:addDemoMirrors()
   self.mirrors = {
-    vec2(200, 50),
-    vec2(300, -50)
+    {vec2(200, 50),
+    vec2(300, -50)},
+    {vec2(-300, 0),
+    vec2(-200, 30)},
+    {vec2(-300, 0),
+    vec2(-200, -30)}
   }
 end

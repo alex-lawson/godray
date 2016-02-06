@@ -86,7 +86,7 @@ end
 -- check if point p is on line qr
 function vutil.pointOnLine(p, q, r)
   r = vutil.cross(r - q, p - q)
-  return math.abs(r) < 0.0001
+  return math.abs(r) < 0.01
 end
 
 function vutil.pointRightOfLine(p, q, r)
@@ -111,8 +111,8 @@ end
 
 function vutil.intersects(p, q, r, s)
   local bbi = vutil.boundingBoxesIntersect(p, q, r, s)
-  local pqrsTouch = vutil.segmentOnlyCrossesLine(p, q, r, s)
-  local rspqTouch = vutil.segmentOnlyCrossesLine(r, s, p, q)
+  local pqrsTouch = vutil.segmentTouchesOrCrossesLine(p, q, r, s)
+  local rspqTouch = vutil.segmentTouchesOrCrossesLine(r, s, p, q)
   return bbi and pqrsTouch and rspqTouch
 end
 

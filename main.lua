@@ -14,7 +14,8 @@ win.scene = am.group()
 local renderer = Renderer.new(win, win.scene)
 local level = LevelManager.new()
 
-win.scene:append(am.translate(vec2(-win.width / 2 + 10, win.height / 2 - 10)) ^ am.text("", vec4(1), "left", "top"):tag("debugInfo"))
+win.scene:append(am.translate(vec2(-win.width / 2 + 10, win.height / 2 - 10)) ^ am.text("", vec4(1), "left", "top"):tag("debugLine1"))
+win.scene:append(am.translate(vec2(-win.width / 2 + 10, win.height / 2 - 26)) ^ am.text("", vec4(1), "left", "top"):tag("debugLine2"))
 
 function levelChanged()
   level:updateRay()
@@ -46,7 +47,8 @@ end
 
 win.scene:action(function(scene)
     local mousePosition = win:mouse_position()
-    win.scene("debugInfo").text = mousePosition.x .. ", " .. mousePosition.y .. "   walls " .. #level.walls / 2 .. "   mirrors " .. #level.mirrors / 2 .. "   relays " .. #level.relays
+    win.scene("debugLine1").text = mousePosition.x .. ", " .. mousePosition.y .. "   walls " .. #level.walls / 2 .. "   mirrors " .. #level.mirrors / 2 .. "   relays " .. #level.relays
+    win.scene("debugLine2").text = "recursion " .. level.lastRecursion
 
     if win:mouse_pressed("left") then
       clearPendingWall()
