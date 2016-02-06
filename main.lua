@@ -18,6 +18,7 @@ win.scene:append(am.translate(vec2(-win.width / 2 + 10, win.height / 2 - 10)) ^ 
 win.scene:append(am.translate(vec2(-win.width / 2 + 10, win.height / 2 - 28)) ^ am.text("", vec4(1), "left", "top"):tag("debugLine2"))
 
 function levelChanged()
+  level:save("autosave")
   level:updateRay()
   renderer:setRelays(level.relays)
   renderer:setRay(level.ray)
@@ -46,7 +47,7 @@ function clearPendingMirror()
 end
 
 function snapSegment(p, q, resolution)
-  resolution = resolution or math.pi / 2
+  resolution = resolution or math.pi / 8
 
   local qa = vutil.angle(q - p)
 
@@ -100,7 +101,10 @@ win.scene:action(function(scene)
     end
 
     if not selectedRelay then
-      if win:key_pressed("3") or win:key_pressed("4") then
+      if win:key_down("5") then
+        level.sourcePos = vec2(mousePosition.x, level.sourcePos.y)
+        levelChanged()
+      elseif win:key_pressed("3") or win:key_pressed("4") then
         clearPendingWall()
         clearPendingMirror()
         level:addRelay(mousePosition, 0, win:key_pressed("4"))
@@ -150,7 +154,9 @@ win.scene:action(function(scene)
     end
   end)
 
-level:addDemoWalls()
--- level:addDemoMirrors()
-level:addDemoRelays()
+if not level:load("autosave") then
+  level:addDemoWalls()
+  level:addDemoMirrors()
+  level:addDemoRelays()
+end
 levelChanged()

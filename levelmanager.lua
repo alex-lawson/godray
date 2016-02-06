@@ -24,6 +24,34 @@ function LevelManager.new()
   return newLevelManager
 end
 
+-- SAVING AND LOADING
+
+function LevelManager:save(saveName)
+  local state = {}
+
+  state.sourcePos = self.sourcePos
+  state.sourceAngle = self.sourceAngle
+  state.relays = self.relays
+  state.walls = self.walls
+  state.mirrors = self.mirrors
+
+  am.save_state(saveName, state)
+end
+
+function LevelManager:load(saveName)
+  local state = am.load_state(saveName)
+  if state then
+    self.sourcePos = state.sourcePos
+    self.sourceAngle = state.sourceAngle
+    self.relays = state.relays
+    self.walls = state.walls
+    self.mirrors = state.mirrors
+    return true
+  else
+    return false
+  end
+end
+
 -- RELAY MANAGEMENT
 
 function LevelManager:setSource(sourcePos, sourceAngle)
