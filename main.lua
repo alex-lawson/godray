@@ -46,7 +46,7 @@ function clearPendingMirror()
 end
 
 function snapSegment(p, q, resolution)
-  resolution = resolution or math.pi / 8
+  resolution = resolution or math.pi / 2
 
   local qa = vutil.angle(q - p)
 
@@ -64,8 +64,8 @@ function snapSegment(p, q, resolution)
 end
 
 win.scene:action(function(scene)
-    local mousePosition = win:mouse_position()
-    win.scene("debugLine1").text = mousePosition.x .. ", " .. mousePosition.y .. "   walls " .. #level.walls / 2 .. "   mirrors " .. #level.mirrors / 2 .. "   relays " .. #level.relays
+    local mousePosition = vutil.floor(win:mouse_position())
+    win.scene("debugLine1").text = mousePosition.x .. ", " .. mousePosition.y .. "   walls " .. #level.walls .. "   mirrors " .. #level.mirrors .. "   relays " .. #level.relays
     win.scene("debugLine2").text = "recursion " .. level.lastRecursion
 
     if win:mouse_pressed("left") then
