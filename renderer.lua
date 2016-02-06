@@ -34,6 +34,13 @@ function Renderer.new(window, scene)
 
   newRenderer.MVP = mat4(mat2(2 / window.width, 0, 0, 2 / window.height))
 
+  newRenderer.relayRenderBind = am.bind({
+    vert = am.vec2_array({vec2(0), vec2(0)}),
+    color = newRenderer.relayColor,
+    MVP = newRenderer.MVP
+  }):tag("relayRenderBind")
+  newRenderer.relayRenderer = am.use_program(newRenderer.shaderProgram) ^ newRenderer.relayRenderBind ^ am.draw("triangles")
+
   newRenderer.wallRenderBind = am.bind({
     vert = am.vec2_array({vec2(0), vec2(0)}),
     color = newRenderer.wallColor,
@@ -55,16 +62,9 @@ function Renderer.new(window, scene)
   }):tag("rayRenderBind")
   newRenderer.rayRenderer = am.use_program(newRenderer.shaderProgram) ^ newRenderer.rayRenderBind ^ am.draw("line_strip")
 
-  newRenderer.relayRenderBind = am.bind({
-    vert = am.vec2_array({vec2(0), vec2(0)}),
-    color = newRenderer.relayColor,
-    MVP = newRenderer.MVP
-  }):tag("relayRenderBind")
-  newRenderer.relayRenderer = am.use_program(newRenderer.shaderProgram) ^ newRenderer.relayRenderBind ^ am.draw("triangles")
-
+  scene:append(newRenderer.relayRenderer)
   scene:append(newRenderer.wallRenderer)
   scene:append(newRenderer.mirrorRenderer)
-  scene:append(newRenderer.relayRenderer)
   scene:append(newRenderer.rayRenderer)
 
   return newRenderer
@@ -95,7 +95,6 @@ function Renderer:setRay(ray)
 end
 
 function Renderer:setRelays(relays)
-
   self.relayRenderBind.vert = am.vec2_array(self:buildRelayTriangles(relays))
 end
 
@@ -106,9 +105,18 @@ function Renderer:buildRelayTriangles(relays)
 
   local points = {}
   for i, relay in ipairs(relays) do
-    table.insert(points, relay[1] + vutil.withAngle(relay[2]) * self.relaySize)
-    table.insert(points, relay[1] + vutil.withAngle(relay[2] + 2.3) * self.relaySize * 0.5)
-    table.insert(points, relay[1] + vutil.withAngle(relay[2] - 2.3) * self.relaySize * 0.5)
+    if relay[3] then
+      table.insert(points, relay[1] + vutil.withAngle(relay[2]) * self.relaySize * 0.25)
+      table.insert(points, relay[1] + vutil.withAngle(relay[2] + math.pi) * self.relaySize * 0.25)
+      table.insert(points, relay[1] + vutil.withAngle(relay[2] + math.pi * 0.5) * self.relaySize * 0.25)
+      table.insert(points, relay[1] + vutil.withAngle(relay[2]) * self.relaySize * 0.25)
+      table.insert(points, relay[1] + vutil.withAngle(relay[2] + math.pi) * self.relaySize * 0.25)
+      table.insert(points, relay[1] + vutil.withAngle(relay[2] - math.pi * 0.5) * self.relaySize * 0.25)
+    else
+      table.insert(points, relay[1] + vutil.withAngle(relay[2]) * self.relaySize)
+      table.insert(points, relay[1] + vutil.withAngle(relay[2] + 2.3) * self.relaySize * 0.5)
+      table.insert(points, relay[1] + vutil.withAngle(relay[2] - 2.3) * self.relaySize * 0.5)
+    end
   end
   return points
 end

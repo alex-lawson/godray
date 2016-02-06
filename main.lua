@@ -79,10 +79,10 @@ win.scene:action(function(scene)
     end
 
     if not selectedRelay then
-      if win:key_pressed("r") then
+      if win:key_pressed("3") or win:key_pressed("4") then
         clearPendingWall()
         clearPendingMirror()
-        level:addRelay(mousePosition, 0)
+        level:addRelay(mousePosition, 0, win:key_pressed("4"))
         levelChanged()
       elseif win:key_pressed("1") then
         if pendingWall then

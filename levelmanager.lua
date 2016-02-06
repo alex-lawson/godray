@@ -1,6 +1,7 @@
 local vutil = require "vutil"
 
 MinimumBounce = 3
+RaySnapDistance = 10
 
 local LevelManager = ...
 
@@ -30,16 +31,23 @@ function LevelManager:setSource(sourcePos, sourceAngle)
   self.sourceAngle = sourceAngle
 end
 
-function LevelManager:addRelay(position, angle)
-  table.insert(self.relays, {position, angle})
+function LevelManager:addRelay(position, angle, reflective)
+  table.insert(self.relays, {position, angle, reflective})
 end
 
 function LevelManager:removeRelay(relay)
   table.remove(self.relays, table.search(self.relays, relay))
 end
 
-function LevelManager:removeRelayAt(position)
-  self.relays = table.filter(self.relays, function(r) return r[1] ~= position end)
+function LevelManager:relayMirrorGeometry()
+  local geometry = {}
+  for i, relay in ipairs(self.relays) do
+    if relay[3] then
+      table.insert(geometry, relay[1] + vutil.withAngle(relay[2] + math.pi * 0.5) * RaySnapDistance)
+      table.insert(geometry, relay[1] + vutil.withAngle(relay[2] - math.pi * 0.5) * RaySnapDistance)
+    end
+  end
+  return geometry
 end
 
 function LevelManager:addDemoRelays()
@@ -59,13 +67,17 @@ function LevelManager:traceRay(position, angle, points, recursion, lastMirror)
   if recursion > 10 then return points, recursion end
 
   -- log("tracing ray with recursion %s position %s angle %s", recursion, position, angle)
-
   local searchEndpoint = position + vutil.withAngle(angle) * self.maxRayLength
-  local relay = self:relayNearLine(position, searchEndpoint, 10, lastMirror)
+  local relay = self:relayNearLine(position, searchEndpoint, RaySnapDistance, lastMirror)
   if relay then
     local oldIndex = table.search(points, relay[1])
     if oldIndex == #points - 1 then
       return points, recursion
+    elseif relay[3] then
+      local v = relay[1] - position
+      local reflectVector = vutil.reflect(v, vutil.withAngle(relay[2]))
+      table.insert(points, relay[1])
+      return self:traceRay(relay[1], vutil.angle(reflectVector), points, recursion + 1)
     elseif oldIndex then
       table.insert(points, relay[1])
       return points, recursion
@@ -92,11 +104,7 @@ function LevelManager:traceRay(position, angle, points, recursion, lastMirror)
   elseif collidesMirror and (not collidesWall or wallDist > mirrorDist) then
     local v = mirrorPoint - position
     local sv = mirror[2] - mirror[1]
-    local normal = vec2(-sv.y, sv.x)
-    if vutil.pointRightOfLine(position, mirror[1], mirror[2]) ~= vutil.pointRightOfLine(mirrorPoint + normal, mirror[1], mirror[2]) then
-      normal = vec2(sv.y, -sv.x)
-    end
-    normal = vutil.norm(normal)
+    local normal = vutil.norm(vec2(-sv.y, sv.x))
     local reflectVector = vutil.reflect(v, normal)
     table.insert(points, mirrorPoint)
     return self:traceRay(mirrorPoint, vutil.angle(reflectVector), points, recursion + 1, mirror)
@@ -185,7 +193,9 @@ function LevelManager:wallRenderGeometry()
 end
 
 function LevelManager:mirrorRenderGeometry()
-  return self.geometryWithPreview(self.mirrors, self.mirrorPreview)
+  local finalGeometry = self:relayMirrorGeometry()
+  table.append(finalGeometry, self.geometryWithPreview(self.mirrors, self.mirrorPreview))
+  return finalGeometry
 end
 
 function LevelManager.geometryWithPreview(baseGeometry, previewGeometry)
