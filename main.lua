@@ -15,7 +15,7 @@ local renderer = Renderer.new(win, win.scene)
 local level = LevelManager.new()
 
 win.scene:append(am.translate(vec2(-win.width / 2 + 10, win.height / 2 - 10)) ^ am.text("", vec4(1), "left", "top"):tag("debugLine1"))
-win.scene:append(am.translate(vec2(-win.width / 2 + 10, win.height / 2 - 26)) ^ am.text("", vec4(1), "left", "top"):tag("debugLine2"))
+win.scene:append(am.translate(vec2(-win.width / 2 + 10, win.height / 2 - 28)) ^ am.text("", vec4(1), "left", "top"):tag("debugLine2"))
 
 function levelChanged()
   level:updateRay()
@@ -45,6 +45,24 @@ function clearPendingMirror()
   end
 end
 
+function snapSegment(p, q, resolution)
+  resolution = resolution or math.pi / 8
+
+  local qa = vutil.angle(q - p)
+
+  local bestAngle, bestDist
+  for i = 0, math.floor((math.pi * 2) / resolution) do
+    local thisAngle = i * resolution
+    local angleDiff = ((((thisAngle - qa) % (2*math.pi)) + (3*math.pi)) % (2*math.pi)) - math.pi
+    if not bestDist or math.abs(angleDiff) < bestDist then
+      bestAngle = thisAngle
+      bestDist = math.abs(angleDiff)
+    end
+  end
+
+  return p + vutil.withAngle(bestAngle) * vutil.mag(q - p)
+end
+
 win.scene:action(function(scene)
     local mousePosition = win:mouse_position()
     win.scene("debugLine1").text = mousePosition.x .. ", " .. mousePosition.y .. "   walls " .. #level.walls / 2 .. "   mirrors " .. #level.mirrors / 2 .. "   relays " .. #level.relays
@@ -60,12 +78,12 @@ win.scene:action(function(scene)
     end
 
     if pendingWall then
-      level.wallPreview = {pendingWall, mousePosition}
+      level.wallPreview = {pendingWall, snapSegment(pendingWall, mousePosition)}
       renderer:setWalls(level:wallRenderGeometry())
     end
 
     if pendingMirror then
-      level.mirrorPreview = {pendingMirror, mousePosition}
+      level.mirrorPreview = {pendingMirror, snapSegment(pendingMirror, mousePosition)}
       renderer:setMirrors(level:mirrorRenderGeometry())
     end
 
@@ -89,22 +107,22 @@ win.scene:action(function(scene)
         levelChanged()
       elseif win:key_pressed("1") then
         if pendingWall then
-          level:addWall(pendingWall, mousePosition)
+          local snapPosition = snapSegment(pendingWall, mousePosition)
+          level:addWall(pendingWall, snapPosition)
           levelChanged()
-        end
-
-        if not pendingMirror then
+          pendingWall = snapPosition
+        elseif not pendingMirror then
           pendingWall = mousePosition
         else
-          clearPendingMirror()
+          clearPendingWall()
         end
       elseif win:key_pressed("2") then
         if pendingMirror then
-          level:addMirror(pendingMirror, mousePosition)
+          local snapPosition = snapSegment(pendingMirror, mousePosition)
+          level:addMirror(pendingMirror, snapPosition)
           levelChanged()
-        end
-
-        if not pendingWall then
+          pendingMirror = snapPosition
+        elseif not pendingWall then
           pendingMirror = mousePosition
         else
           clearPendingWall()
@@ -133,6 +151,6 @@ win.scene:action(function(scene)
   end)
 
 level:addDemoWalls()
-level:addDemoMirrors()
+-- level:addDemoMirrors()
 level:addDemoRelays()
 levelChanged()

@@ -99,7 +99,8 @@ function LevelManager:traceRay(position, angle, points, recursion, lastMirror)
     mirrorPoint, mirrorDist, mirror = self:collidesMirrorAt(position, searchEndpoint, lastMirror)
   end
 
-  if collidesMirror and mirrorDist < MinimumBounce then
+  if collidesMirror and mirrorDist < MinimumBounce and
+      (#points < 2 or vutil.dist(points[#points], points[#points - 1])) then
     return points, 99
   elseif collidesMirror and (not collidesWall or wallDist > mirrorDist) then
     local v = mirrorPoint - position
